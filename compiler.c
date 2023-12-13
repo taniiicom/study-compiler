@@ -14,6 +14,13 @@
 #define ID    259
 #define DONE  260
 
+#define ASSIGN 261
+
+#define WHILE 262
+#define DO 263
+#define BEGIN 263
+#define END 264
+
 int tokenval;
 int lineno;
 
@@ -26,10 +33,12 @@ struct entry symtable[];
 
 int lexan();
 void parse();
-void parse();
+void stmt();
+void stmt_list();
 void expr();
 void term();
 void factor();
+void cond();
 void match(int);
 void emit(int, int);
 int lookup(char[]);
@@ -52,6 +61,11 @@ int lexan()
 			;
 		else if ( t == '\n')
 			lineno = lineno + 1;
+		else if (t == ':') {
+			if (getchar() == '=') {
+				return ASSIGN;
+			}
+		}
 		else if (isdigit(t)) {
 			ungetc(t, stdin);
 			scanf("%d", &tokenval);    // for gcc
@@ -91,9 +105,53 @@ int lookahead;
 
 void parse()
 {
+	// 1 トークン分読んで型が代入される
 	lookahead = lexan();
 	while (lookahead != DONE) {
-		expr(); match(';');
+		stmt(); match(';');
+	}
+}
+
+// statement
+void stmt()
+{
+	// 文の解析を行う
+	// それぞれ 1 つ目の文字に引っかかったら次の文字を読み込む
+	switch (lookahead) {
+	case ID: // 代入分の翻訳
+		printf("lvalue\t"); // "lvalue" は左辺値のこと
+		emit(ID, tokenval); // 出力関数を呼び出し
+		match(lookahead); // 先読み
+		if (lookahead == ASSIGN) {
+			match(lookahead); // 先読み
+			// 代入分の右辺の式を解析
+			expr();
+			printf(":=\n");
+		}
+		break;
+	
+	case WHILE: // while 文の翻訳
+		match(WHILE);
+		printf("label\ttest\n");
+		cond();
+		printf("gofalse\tout\n");
+		match(DO);
+		stmt();
+		printf("goto\ttest\n");
+		printf("label\tout\n");
+
+	case BEGIN:
+		match(BEGIN);
+		stmt();
+		while (lookahead != END) {
+			match(lookahead); // 先読み
+			stmt();
+		}
+		match(END);
+		break;
+
+	default:
+		break;
 	}
 }
 
@@ -120,7 +178,9 @@ void term()
 		switch (lookahead) {
 		case '*': case '/': case DIV: case MOD:
 			t = lookahead;
-			match(lookahead); factor(); emit(t, NONE);
+			match(lookahead);
+			factor();
+			emit(t, NONE);
 			continue;
 		default:
 			return;
@@ -133,14 +193,38 @@ void factor()
 		case '(':
 			match('('); expr(); match(')'); break;
 		case NUM:
+			printf("push ");
 			emit(NUM, tokenval); match(NUM); break;
 		case ID:
-			emit(ID, tokenval); match(ID); break;
+			printf("rvalue\t");
+			emit(ID, tokenval);
+			match(ID);
+			break;
 		default:
 			error("syntax error"); break;
 	}
 }
 
+void cond()
+{
+	int t;
+	expr();
+	
+	switch (lookahead)
+	{
+	case '<': case '>': case '=':
+		t = lookahead;
+		match(lookahead);
+		expr();
+		emit(t, NONE);
+		break;
+	default:
+		break;
+	}
+	return;
+}
+
+// 現在の先読みトークンが t と一致するかどうかを確認し, 次の先読みトークンを読み込む
 void match(t)
 	int t;
 {
@@ -155,7 +239,7 @@ void emit(t, tval)
 	int t, tval;
 {
 	switch(t) {
-		case '+': case '-': case '*': case '/':
+		case '+': case '-': case '*': case '/': case '<': case '>': case '=':
 			printf("%c\n", t); break;
 		case DIV:
 			printf("DIV\n"); break;
@@ -213,6 +297,10 @@ int insert(s, tok)
 struct entry keywords[] = {
 	"div", DIV,
 	"mod", MOD,
+	"while", WHILE,
+	"do", DO,
+	"begin", BEGIN,
+	"end", END,
 	0, 0
 };
 
