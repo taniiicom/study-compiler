@@ -118,13 +118,13 @@ void stmt()
 	// 文の解析を行う
 	// それぞれ 1 つ目の文字に引っかかったら次の文字を読み込む
 	switch (lookahead) {
-	case ID: // 代入分の翻訳
+	case ID: // 代入文の翻訳
 		printf("lvalue\t"); // "lvalue" は左辺値のこと
 		emit(ID, tokenval); // 出力関数を呼び出し
 		match(lookahead); // 先読み
 		if (lookahead == ASSIGN) {
 			match(lookahead); // 先読み
-			// 代入分の右辺の式を解析
+			// 代入文の右辺の式を解析
 			expr();
 			printf(":=\n");
 		}
@@ -139,6 +139,7 @@ void stmt()
 		stmt();
 		printf("goto\ttest\n");
 		printf("label\tout\n");
+		break;
 
 	case BEGIN:
 		match(BEGIN);
@@ -193,7 +194,7 @@ void factor()
 		case '(':
 			match('('); expr(); match(')'); break;
 		case NUM:
-			printf("push ");
+			printf("push\t");
 			emit(NUM, tokenval); match(NUM); break;
 		case ID:
 			printf("rvalue\t");
